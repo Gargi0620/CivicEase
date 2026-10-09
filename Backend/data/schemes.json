@@ -1,0 +1,263 @@
+[
+  {
+    "scheme_id": "MH-WOMEN-STARTUP-001",
+    "name": "Punyashlok Ahilyadevi Holkar Women Startup Scheme",
+    "level": "state",
+    "state": "Maharashtra",
+    "category": "Women Entrepreneurship",
+    "description": "Financial assistance scheme for women-led startups in Maharashtra.",
+    "benefits": {
+      "type": "financial_grant",
+      "minimum_amount": 100000,
+      "maximum_amount": 2500000
+    },
+    "eligibility_rules": [
+      {
+        "field": "women_ownership_percentage",
+        "operator": "greater_than_or_equal",
+        "value": 51,
+        "reason": "Women must hold at least 51% ownership in the startup."
+      },
+      {
+        "field": "startup_age_years",
+        "operator": "greater_than_or_equal",
+        "value": 1,
+        "reason": "The startup must have been operational for at least one year."
+      },
+      {
+        "field": "annual_turnover",
+        "operator": "between",
+        "min_value": 1000000,
+        "max_value": 10000000,
+        "reason": "Annual turnover must be between ₹10 lakh and ₹1 crore."
+      }
+    ],
+    "required_documents": [
+      "Startup registration documents",
+      "DPIIT recognition certificate",
+      "Proof of women ownership",
+      "Business financial documents"
+    ],
+    "application_method": "Online",
+    "official_source": "Maharashtra State Innovation Society",
+    "last_verified": "2026-10"
+  },
+  {
+    "scheme_id": "MH-CMEGP-001",
+    "name": "Chief Minister Employment Generation Programme",
+    "level": "state",
+    "state": "Maharashtra",
+    "category": "Self Employment",
+    "description": "Maharashtra government credit-linked support programme for self-employment and enterprise creation.",
+    "benefits": {
+      "type": "credit_linked_subsidy",
+      "maximum_manufacturing_project_cost": 10000000,
+      "maximum_service_project_cost": 5000000
+    },
+    "eligibility_rules": [
+      {
+        "field": "state",
+        "operator": "equals",
+        "value": "Maharashtra",
+        "reason": "Applicant must satisfy the Maharashtra residency requirement."
+      },
+      {
+        "field": "age",
+        "operator": "greater_than_or_equal",
+        "value": 18,
+        "reason": "Applicant must be at least 18 years old."
+      },
+      {
+        "field": "age",
+        "operator": "less_than_or_equal",
+        "value": 45,
+        "reason": "The standard upper age limit is 45 years."
+      },
+      {
+        "field": "education_requirement",
+        "operator": "conditional",
+        "value": true,
+        "reason": "Minimum educational qualification depends on the proposed project cost."
+      }
+    ],
+    "special_conditions": [
+      "Women and other specified special categories receive age relaxation under the scheme.",
+      "Applicant should not have already received the specified government subsidy benefit.",
+      "Project must fall within permitted activities."
+    ],
+    "required_documents": [
+      "Aadhaar Card",
+      "Residence/Domicile proof",
+      "Educational qualification proof where applicable",
+      "Project report",
+      "Bank-related documents",
+      "Category certificate where applicable"
+    ],
+    "application_method": "Online",
+    "official_source": "Maharashtra Industries Department",
+    "last_verified": "2026-10"
+  },
+  {
+    "scheme_id": "MH-SWARNIMA-001",
+    "name": "Swarnima",
+    "level": "state",
+    "state": "Maharashtra",
+    "category": "Women Entrepreneurship",
+    "description": "Low-interest financial assistance for women from the OBC category to support self-employment activities.",
+    "benefits": {
+      "type": "loan",
+      "maximum_project_amount": 500000,
+      "interest_rate": 5,
+      "repayment_period_years": 3
+    },
+    "eligibility_rules": [
+      {
+        "field": "gender",
+        "operator": "equals",
+        "value": "female",
+        "reason": "The scheme is intended for female beneficiaries."
+      },
+      {
+        "field": "social_category",
+        "operator": "equals",
+        "value": "OBC",
+        "reason": "Applicant must belong to the Other Backward Class category."
+      },
+      {
+        "field": "state",
+        "operator": "equals",
+        "value": "Maharashtra",
+        "reason": "Applicant must be domiciled in Maharashtra."
+      },
+      {
+        "field": "age",
+        "operator": "between",
+        "min_value": 18,
+        "max_value": 50,
+        "reason": "Applicant age must be between 18 and 50 years."
+      },
+      {
+        "field": "annual_family_income",
+        "operator": "conditional_income_limit",
+        "value": true,
+        "reason": "Family income must be within the applicable rural or urban limit."
+      }
+    ],
+    "income_limits": {
+      "rural": 98000,
+      "urban": 120000
+    },
+    "required_documents": [
+      "Aadhaar Card",
+      "Passport-size photographs",
+      "Maharashtra domicile/residence certificate",
+      "Bank account details",
+      "Proof of age",
+      "Caste certificate",
+      "Income certificate"
+    ],
+    "application_method": "Offline",
+    "official_source": "myScheme / Government of Maharashtra",
+    "last_verified": "2026-10"
+  },
+  {
+    "scheme_id": "IN-PMEGP-001",
+    "name": "Prime Minister's Employment Generation Programme",
+    "level": "central",
+    "state": "All India",
+    "category": "Self Employment",
+    "description": "Credit-linked subsidy programme supporting new viable micro enterprises.",
+    "benefits": {
+      "type": "credit_linked_subsidy"
+    },
+    "eligibility_rules": [
+      {
+        "field": "age",
+        "operator": "greater_than_or_equal",
+        "value": 18,
+        "reason": "Applicant must be at least 18 years old."
+      },
+      {
+        "field": "new_unit",
+        "operator": "equals",
+        "value": true,
+        "reason": "PMEGP primarily supports eligible new units."
+      },
+      {
+        "field": "capital_expenditure",
+        "operator": "greater_than",
+        "value": 0,
+        "reason": "Projects must involve capital expenditure."
+      },
+      {
+        "field": "previous_government_subsidy",
+        "operator": "equals",
+        "value": false,
+        "reason": "Units that have already availed specified government subsidy are not eligible."
+      }
+    ],
+    "special_conditions": [
+      "Only one person from one family is eligible for financial assistance for setting up projects under PMEGP.",
+      "Project activity must fall within permitted activities.",
+      "Certain trading activities are subject to scheme-specific restrictions."
+    ],
+    "required_documents": [
+      "Aadhaar Card",
+      "PAN Card",
+      "Project report",
+      "Educational qualification documents where applicable",
+      "Category certificate where applicable",
+      "Bank-related documents"
+    ],
+    "application_method": "Online",
+    "official_source": "Khadi and Village Industries Commission",
+    "last_verified": "2026-10"
+  },
+  {
+    "scheme_id": "IN-PMMY-001",
+    "name": "Pradhan Mantri MUDRA Yojana",
+    "level": "central",
+    "state": "All India",
+    "category": "Micro Enterprise",
+    "description": "Collateral-free institutional credit for micro enterprises.",
+    "benefits": {
+      "type": "collateral_free_credit",
+      "shishu_max": 50000,
+      "kishore_max": 500000,
+      "tarun_max": 1000000,
+      "tarun_plus_max": 2000000
+    },
+    "eligibility_rules": [
+      {
+        "field": "business_sector",
+        "operator": "allowed",
+        "value": [
+          "manufacturing",
+          "trading",
+          "services",
+          "agriculture_allied"
+        ],
+        "reason": "The enterprise must fall within an eligible business activity."
+      },
+      {
+        "field": "enterprise_type",
+        "operator": "equals",
+        "value": "micro_enterprise",
+        "reason": "PMMY provides institutional credit to micro enterprises."
+      }
+    ],
+    "special_conditions": [
+      "Tarun Plus is available to entrepreneurs who have previously availed and successfully repaid a Tarun-category loan."
+    ],
+    "required_documents": [
+      "Identity proof",
+      "Address proof",
+      "Business-related documents",
+      "Bank account details",
+      "Loan-specific documents requested by the lending institution"
+    ],
+    "application_method": "Through participating lending institutions",
+    "official_source": "Department of Financial Services, Ministry of Finance",
+    "last_verified": "2026-10"
+  }
+]
