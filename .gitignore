@@ -1,26 +1,44 @@
 
-# Python
+# ==============================
+# Node.js dependencies
+# ==============================
+node_modules/
+Frontend/node_modules/
+
+# ==============================
+# Next.js generated files
+# ==============================
+Frontend/.next/
+Frontend/out/
+
+# ==============================
+# Python generated files
+# ==============================
 __pycache__/
 *.py[cod]
 *.pyo
-
-# Virtual environments
-.venv/
+Backend/venv/
 venv/
-env/
+.venv/
 
+# ==============================
 # Environment variables and secrets
+# ==============================
 .env
 .env.*
 !.env.example
 
+# ==============================
 # Editors and operating system
+# ==============================
 .vscode/
-.idea/
 .DS_Store
 Thumbs.db
 
-# Test and tooling caches
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
+# ==============================
+# Logs
+# ==============================
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+*.log
