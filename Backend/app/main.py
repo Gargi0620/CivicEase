@@ -11,6 +11,21 @@ from app.Rules import check_scheme_eligibility
 
 app = FastAPI(title="CivicEase API")
 
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 SCHEMES_FILE = (
     Path(__file__).resolve().parent.parent / "data" / "schemes.json"
 )

@@ -1,6 +1,8 @@
 
 "use client";
 
+import "./schemes.css";
+
 import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -52,8 +54,9 @@ function formatValue(value: unknown): string {
 
   if (typeof value === "object") {
     return Object.entries(value as Record<string, unknown>)
-      .map(([key, item]) =>
-        `${key.replace(/_/g, " ")}: ${formatValue(item)}`
+      .map(
+        ([key, item]) =>
+          `${key.replace(/_/g, " ")}: ${formatValue(item)}`
       )
       .join(" · ");
   }
@@ -62,18 +65,27 @@ function formatValue(value: unknown): string {
 }
 
 function getName(scheme: Scheme): string {
-  return scheme.scheme_name || scheme.name || scheme.title || "Unnamed scheme";
+  return (
+    scheme.scheme_name ||
+    scheme.name ||
+    scheme.title ||
+    "Unnamed scheme"
+  );
 }
 
 function getId(scheme: Scheme, index: number): string {
   return String(
-    scheme.scheme_id ?? scheme.id ?? `CE-${String(index + 1).padStart(3, "0")}`
+    scheme.scheme_id ??
+      scheme.id ??
+      `CE-${String(index + 1).padStart(3, "0")}`
   );
 }
 
 function getOfficialLink(scheme: Scheme): string | undefined {
   const value =
-    scheme.official_link || scheme.official_source || scheme.source_url;
+    scheme.official_link ||
+    scheme.official_source ||
+    scheme.source_url;
 
   return typeof value === "string" && /^https?:\/\//i.test(value)
     ? value
@@ -95,12 +107,18 @@ export default function BrowseSchemesPage() {
         setLoading(true);
         setError("");
 
-        const response = await fetch("http://127.0.0.1:8000/schemes", {
-          signal: controller.signal,
-        });
+        // Read the local JSON dataset, not PostgreSQL.
+        const response = await fetch(
+          "http://127.0.0.1:8000/schemes/json",
+          {
+            signal: controller.signal,
+          }
+        );
 
         if (!response.ok) {
-          throw new Error(`Backend returned status ${response.status}.`);
+          throw new Error(
+            `Backend returned status ${response.status}.`
+          );
         }
 
         const data: unknown = await response.json();
@@ -115,7 +133,9 @@ export default function BrowseSchemesPage() {
             : null;
 
         if (!list) {
-          throw new Error("The API response does not contain a schemes list.");
+          throw new Error(
+            "The API response does not contain a schemes list."
+          );
         }
 
         setSchemes(list as Scheme[]);
@@ -158,7 +178,11 @@ export default function BrowseSchemesPage() {
       ];
 
       return fields
-        .filter((value) => typeof value === "string" || typeof value === "number")
+        .filter(
+          (value) =>
+            typeof value === "string" ||
+            typeof value === "number"
+        )
         .join(" ")
         .toLowerCase()
         .includes(query);
@@ -191,9 +215,9 @@ export default function BrowseSchemesPage() {
         <h1>Explore Schemes</h1>
 
         <p>
-          Discover government support for women entrepreneurs. Compare schemes
-          and explore their benefits, eligibility requirements and application
-          details.
+          Discover government support for women entrepreneurs. Compare
+          schemes and explore their benefits, eligibility requirements
+          and application details.
         </p>
 
         <div className="browse-search">
@@ -210,7 +234,9 @@ export default function BrowseSchemesPage() {
         <div className="browse-count">
           {loading
             ? "Loading schemes..."
-            : `${filteredSchemes.length} scheme${filteredSchemes.length === 1 ? "" : "s"} found`}
+            : `${filteredSchemes.length} scheme${
+                filteredSchemes.length === 1 ? "" : "s"
+              } found`}
         </div>
       </section>
 
@@ -226,7 +252,8 @@ export default function BrowseSchemesPage() {
             <p>{error}</p>
             <p>
               Ensure your FastAPI backend is running at{" "}
-              <code>http://127.0.0.1:8000</code>.
+              <code>http://127.0.0.1:8000</code> and that{" "}
+              <code>/schemes/json</code> works.
             </p>
             <button
               className="retry-button"
@@ -263,29 +290,49 @@ export default function BrowseSchemesPage() {
 
                   return (
                     <Fragment key={`${id}-${index}`}>
-                      <tr className={expanded ? "scheme-row selected" : "scheme-row"}>
+                      <tr
+                        className={
+                          expanded
+                            ? "scheme-row selected"
+                            : "scheme-row"
+                        }
+                      >
                         <td>
                           <span className="scheme-id">{id}</span>
                         </td>
+
                         <td>
-                          <span className="scheme-name">{getName(scheme)}</span>
+                          <span className="scheme-name">
+                            {getName(scheme)}
+                          </span>
                           <span className="scheme-mobile-meta">
-                            {formatValue(scheme.department || scheme.ministry)}
+                            {formatValue(
+                              scheme.department || scheme.ministry
+                            )}
                           </span>
                         </td>
+
                         <td>
-                          {formatValue(scheme.department || scheme.ministry)}
+                          {formatValue(
+                            scheme.department || scheme.ministry
+                          )}
                         </td>
+
                         <td>
                           <span className="scheme-level">
-                            {formatValue(scheme.scheme_level || scheme.level)}
+                            {formatValue(
+                              scheme.scheme_level || scheme.level
+                            )}
                           </span>
                         </td>
+
                         <td>
                           <button
                             className="details-button"
                             type="button"
-                            onClick={() => setExpandedId(expanded ? null : id)}
+                            onClick={() =>
+                              setExpandedId(expanded ? null : id)
+                            }
                             aria-expanded={expanded}
                           >
                             {expanded ? "Hide" : "View"}
@@ -307,19 +354,24 @@ export default function BrowseSchemesPage() {
                               <div className="detail-grid">
                                 <div className="detail-item detail-wide">
                                   <h4>Description</h4>
-                                  <p>{formatValue(scheme.description)}</p>
+                                  <p>
+                                    {formatValue(scheme.description)}
+                                  </p>
                                 </div>
 
                                 <div className="detail-item">
                                   <h4>Benefits</h4>
-                                  <p>{formatValue(scheme.benefits)}</p>
+                                  <p>
+                                    {formatValue(scheme.benefits)}
+                                  </p>
                                 </div>
 
                                 <div className="detail-item">
                                   <h4>Eligibility requirements</h4>
                                   <p>
                                     {formatValue(
-                                      scheme.eligibility_rules ?? scheme.eligibility
+                                      scheme.eligibility_rules ??
+                                        scheme.eligibility
                                     )}
                                   </p>
                                 </div>
@@ -328,7 +380,8 @@ export default function BrowseSchemesPage() {
                                   <h4>Required documents</h4>
                                   <p>
                                     {formatValue(
-                                      scheme.required_documents ?? scheme.documents
+                                      scheme.required_documents ??
+                                        scheme.documents
                                     )}
                                   </p>
                                 </div>
@@ -377,4 +430,3 @@ export default function BrowseSchemesPage() {
     </main>
   );
 }
-
