@@ -90,5 +90,89 @@
     "missingInformation": "Please provide the required information.",
     "checking": "Checking eligibility...",
     "results": "Eligibility Results"
+  },
+  
+"profile": {
+  "brandSubtitle": "An Initiative for Women Entrepreneurs",
+  "pageTitle": "Profile Setup",
+  "step": "Step {current} of {total}",
+  "completed": "{progress}% completed",
+  "nextStep": "Next Step",
+  "previousStep": "Previous Step",
+  "back": "Back",
+  "required": "*",
+  "requiredQuestions": "Please answer all the required questions.",
+  "saveError": "Unable to save your answers. Please try again.",
+  "loadError": "Unable to load saved answers.",
+  "loading": "Loading your saved answers...",
+  "footerNote": "Your answers help CivicEase identify potentially relevant schemes. Final eligibility depends on each scheme's official rules.",
+  "step1": {
+    "title": "Personal & Location",
+    "heading": "Let's get to know you",
+    "description": "Tell us a little about yourself so we can find government schemes that may be relevant to you and your business.",
+    "businessLocation": "Where will your business operate?",
+    "maharashtra": "Maharashtra",
+    "maharashtraDescription": "My business will operate in Maharashtra",
+    "outsideMaharashtra": "Outside Maharashtra",
+    "outsideDescription": "My business will operate in another state",
+    "district": "Select your district",
+    "chooseDistrict": "Choose your district",
+    "districtError": "Please select your district.",
+    "age": "What is your age group?",
+    "ageBelow18": "Below 18",
+    "age18to25": "18–25",
+    "age26to40": "26–40",
+    "ageAbove40": "Above 40",
+    "education": "What is your highest level of education?",
+    "noEducation": "No formal education",
+    "primary": "Primary school",
+    "secondary": "Secondary school",
+    "higherSecondary": "Higher secondary",
+    "diploma": "Diploma / ITI",
+    "undergraduate": "Undergraduate degree",
+    "postgraduate": "Postgraduate degree",
+    "other": "Other"
+  },
+  "step2": {
+    "title": "Your Business",
+    "heading": "Tell us about your business",
+    "description": "Share details about your business so we can identify relevant schemes.",
+    "stage": "Business stage",
+    "businessType": "Type of business",
+    "otherBusiness": "Please specify your business type"
+  },
+  "step3": {
+    "title": "Ownership & Beneficiary Details",
+    "heading": "Tell us about ownership",
+    "applicantType": "Applicant type",
+    "otherApplicantType": "Please specify applicant type",
+    "ownershipType": "Ownership type",
+    "beneficiaryCategory": "Beneficiary category",
+    "familyIncome": "Annual family income"
+  },
+  "step4": {
+    "title": "Registration & Assistance",
+    "heading": "Tell us what support you need",
+    "isRegistered": "Is your business registered?",
+    "registrations": "Registrations",
+    "otherRegistration": "Please specify registration",
+    "supportNeeds": "What kind of support do you need?",
+    "otherSupport": "Please specify other support",
+    "fundingRange": "Funding amount required"
+  },
+  "step5": {
+    "title": "Review Your Profile",
+    "heading": "Review your answers",
+    "description": "Check your information before completing your profile.",
+    "personalLocation": "Personal & Location",
+    "business": "Your Business",
+    "ownership": "Ownership & Beneficiary Details",
+    "registration": "Registration & Assistance",
+    "edit": "Edit",
+    "completeProfile": "Complete Profile",
+    "success": "Your profile has been completed successfully.",
+    "notProvided": "Not provided"
   }
+}
+
 }

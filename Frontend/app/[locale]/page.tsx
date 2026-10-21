@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { ArrowRight, UserRound, Menu, X } from "lucide-react";
 
+
 function EntrepreneurIllustration() {
   return (
     <div className="entrepreneur-art">
