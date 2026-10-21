@@ -111,9 +111,33 @@ def health_check():
     return {"status": "healthy"}
 
 
+
 # --------------------------------------------------
 # PostgreSQL: retrieve all schemes
 # --------------------------------------------------
+
+def format_scheme(row: dict) -> dict:
+    """Map database column names to the frontend's expected fields."""
+    return {
+        **row,
+        "name": row.get("scheme_name") or row.get("name"),
+        "level": row.get("scheme_level") or row.get("level"),
+        "eligibility_rules": (
+            row.get("eligibility_criteria")
+            or row.get("eligibility_rules")
+        ),
+        "required_documents": (
+            row.get("documents_required")
+            or row.get("required_documents")
+        ),
+        "official_link": (
+            row.get("application_url")
+            or row.get("official_source_url")
+            or row.get("official_link")
+        ),
+        "description": row.get("description") or "",
+    }
+
 
 @app.get("/schemes")
 def get_schemes():
@@ -127,7 +151,7 @@ def get_schemes():
 
         return {
             "total": len(schemes),
-            "schemes": schemes,
+            "schemes": [format_scheme(dict(s)) for s in schemes],
         }
 
     except psycopg.Error:
