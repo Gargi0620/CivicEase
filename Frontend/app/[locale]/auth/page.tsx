@@ -34,13 +34,11 @@ export default function AuthPage() {
       return;
     }
 
-    // Temporary frontend prototype:
-    // Continue to profile setup after signup validation.
     window.location.assign(`/${locale}/profile`);
     return;
   }
 
-  // Login is not connected to the backend yet.
+  // Login will be connected to the backend later.
   setError(t("notConnected"));
 }
 

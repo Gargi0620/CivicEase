@@ -1,149 +1,155 @@
-
 "use client";
-
-import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
-import { useEffect, useMemo, useState } from "react";
+import ChatbotWidget from "../../../components/ChatbotWidget";
 import "./schemes.css";
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import {
+  ArrowLeft,
+  Search,
+  ChevronDown,
+  ChevronUp,
+  FileText,
+  ExternalLink,
+  Landmark,
+  LoaderCircle,
+} from "lucide-react";
+import Link from "next/link";
 
 type Scheme = {
+  id?: string | number;
   scheme_id?: string | number;
   name?: string;
-  level?: string;
-  state?: string;
-  category?: string;
+  scheme_name?: string;
+  title?: string;
   description?: string;
-  benefits?: {
-    type?: string;
-    minimum_amount?: number;
-    maximum_amount?: number;
-    maximum_project_amount?: number;
-    maximum_manufacturing_project_cost?: number;
-    maximum_service_project_cost?: number;
-    interest_rate?: number;
-  };
-  eligibility_rules?: {
-    field?: string;
-    reason?: string;
-  }[];
-  required_documents?: string[];
+  department?: string;
+  ministry?: string;
+  scheme_level?: string;
+  level?: string;
+  benefits?: unknown;
+  eligibility_rules?: unknown;
+  eligibility?: unknown;
+  documents?: unknown;
+  required_documents?: unknown;
   application_method?: string;
+  application_process?: string;
   official_source?: string;
-  last_verified?: string;
-  [key: string]: unknown;
+  official_link?: string;
+  source_url?: string;
 };
 
-function getValue(scheme: Scheme, field: string): string {
-  switch (field) {
-    case "scheme_id":
-      return String(scheme.scheme_id ?? "");
-
-    case "scheme_name":
-      return scheme.name ?? "";
-
-    case "department":
-      return scheme.official_source ?? "";
-
-    case "scheme_level":
-      return scheme.level ?? "";
-
-    case "target_beneficiaries":
-      return scheme.category ?? "";
-
-    case "business_stage":
-      return (
-        scheme.eligibility_rules
-          ?.map((rule) => rule.reason)
-          .filter((reason): reason is string => Boolean(reason))
-          .join(" ") ?? ""
-      );
-
-    case "business_type":
-      return scheme.description ?? "";
-
-    default:
-      return "";
+function formatValue(value: unknown): string {
+  if (value === null || value === undefined || value === "") {
+    return "Information not available";
   }
+
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(formatValue).join(", ");
+  }
+
+  if (typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>)
+      .map(
+        ([key, item]) =>
+          `${key.replace(/_/g, " ")}: ${formatValue(item)}`
+      )
+      .join(" · ");
+  }
+
+  return String(value);
 }
 
-export default function SchemesPage() {
+function getName(scheme: Scheme): string {
+  return (
+    scheme.scheme_name ||
+    scheme.name ||
+    scheme.title ||
+    "Unnamed scheme"
+  );
+}
+
+function getId(scheme: Scheme, index: number): string {
+  return String(
+    scheme.scheme_id ??
+      scheme.id ??
+      `CE-${String(index + 1).padStart(3, "0")}`
+  );
+}
+
+function getOfficialLink(scheme: Scheme): string | undefined {
+  const value =
+    scheme.official_link ||
+    scheme.official_source ||
+    scheme.source_url;
+
+  return typeof value === "string" && /^https?:\/\//i.test(value)
+    ? value
+    : undefined;
+}
+
+export default function BrowseSchemesPage() {
   const [schemes, setSchemes] = useState<Scheme[]>([]);
   const [search, setSearch] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
-    let timeoutId: ReturnType<typeof setTimeout>;
 
     async function loadSchemes() {
-      setLoading(true);
-      setError("");
-
-      // Stop waiting if the API takes longer than 10 seconds.
-      timeoutId = setTimeout(() => controller.abort(), 10000);
-
       try {
-        const response = await fetch(`${API_BASE}/schemes`, {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-          },
-          signal: controller.signal,
-        });
+        setLoading(true);
+        setError("");
+
+        // Read the local JSON dataset, not PostgreSQL.
+        const response = await fetch(
+          "http://127.0.0.1:8000/schemes",
+          {
+            signal: controller.signal,
+          }
+        );
 
         if (!response.ok) {
           throw new Error(
-            `Unable to load schemes (HTTP ${response.status}).`
+            `Backend returned status ${response.status}.`
           );
         }
 
-        const result: unknown = await response.json();
+        const data: unknown = await response.json();
 
-        let records: unknown[] | null = null;
+        const list: unknown[] | null = Array.isArray(data)
+          ? data
+          : data !== null &&
+              typeof data === "object" &&
+              "schemes" in data &&
+              Array.isArray(data.schemes)
+            ? data.schemes
+            : null;
 
-        if (Array.isArray(result)) {
-          records = result;
-        } else if (result && typeof result === "object") {
-          const data = result as Record<string, unknown>;
-
-          if (Array.isArray(data.schemes)) {
-            records = data.schemes;
-          } else if (Array.isArray(data.items)) {
-            records = data.items;
-          } else if (Array.isArray(data.data)) {
-            records = data.data;
-          }
-        }
-
-        if (!records) {
+        if (!list) {
           throw new Error(
-            "The API response is not a list of schemes. Check the GET /schemes response format."
+            "The API response does not contain a schemes list."
           );
         }
 
-        setSchemes(records as Scheme[]);
+        setSchemes(list as Scheme[]);
       } catch (err) {
-        if (controller.signal.aborted) {
-          setError(
-            "The request timed out after 10 seconds. Check that the backend is running and accessible."
-          );
-        } else {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Something went wrong while loading schemes."
-          );
+        if (err instanceof Error && err.name === "AbortError") {
+          return;
         }
-      } finally {
-        clearTimeout(timeoutId);
 
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Could not load schemes from the backend."
+        );
+      } finally {
         if (!controller.signal.aborted) {
-          setLoading(false);
-        } else {
-          // The timeout also needs to end the loading state.
           setLoading(false);
         }
       }
@@ -151,10 +157,7 @@ export default function SchemesPage() {
 
     loadSchemes();
 
-    return () => {
-      clearTimeout(timeoutId);
-      controller.abort();
-    };
+    return () => controller.abort();
   }, []);
 
   const filteredSchemes = useMemo(() => {
@@ -162,114 +165,268 @@ export default function SchemesPage() {
 
     if (!query) return schemes;
 
-    return schemes.filter((scheme) =>
-      [
-        getValue(scheme, "scheme_id"),
-        getValue(scheme, "scheme_name"),
-        getValue(scheme, "department"),
-        getValue(scheme, "scheme_level"),
-        getValue(scheme, "target_beneficiaries"),
-        getValue(scheme, "business_stage"),
-        getValue(scheme, "business_type"),
-      ].some((value) => value.toLowerCase().includes(query))
-    );
+    return schemes.filter((scheme, index) => {
+      const fields = [
+        getName(scheme),
+        getId(scheme, index),
+        scheme.department,
+        scheme.ministry,
+        scheme.scheme_level,
+        scheme.level,
+        scheme.description,
+      ];
+
+      return fields
+        .filter(
+          (value) =>
+            typeof value === "string" ||
+            typeof value === "number"
+        )
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
   }, [schemes, search]);
 
   return (
-    <div className="page-layout">
-      <SiteHeader active="schemes" />
+    <main className="browse-shell">
+      <header className="browse-header">
+        <Link href="/" className="browse-brand">
+          <span className="browse-brand-name">CivicEase</span>
+          <span className="browse-brand-tag">MAHARASHTRA</span>
+          <span className="browse-brand-subtitle">
+            An Initiative for Women Entrepreneurs
+          </span>
+        </Link>
 
-      <main className="schemes-main">
-        <section className="schemes-heading">
-          <div>
-            <h1>Explore Schemes</h1>
-            <p>
-              Comprehensive repository of government schemes and
-              enterprise assistance for women entrepreneurs in Maharashtra.
-            </p>
+        <Link href="/" className="back-home">
+          <ArrowLeft size={16} />
+          Back to Home
+        </Link>
+      </header>
+
+      <section className="browse-intro">
+        <div className="browse-eyebrow">
+          <Landmark size={16} />
+          GOVERNMENT SCHEME DIRECTORY
+        </div>
+
+        <h1>Explore Schemes</h1>
+
+        <p>
+          Discover government support for women entrepreneurs. Compare
+          schemes and explore their benefits, eligibility requirements
+          and application details.
+        </p>
+
+        <div className="browse-search">
+          <Search size={20} />
+          <input
+            type="search"
+            placeholder="Search by scheme name, ID or department..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            aria-label="Search schemes"
+          />
+        </div>
+
+        <div className="browse-count">
+          {loading
+            ? "Loading schemes..."
+            : `${filteredSchemes.length} scheme${
+                filteredSchemes.length === 1 ? "" : "s"
+              } found`}
+        </div>
+      </section>
+
+      <section className="scheme-results">
+        {loading ? (
+          <div className="browse-message">
+            <LoaderCircle className="loading-icon" size={25} />
+            <p>Loading government schemes...</p>
           </div>
-
-          <label className="scheme-search">
-            <span aria-hidden="true">⌕</span>
-            <input
-              type="search"
-              placeholder="Search scheme name or department..."
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              aria-label="Search schemes"
-            />
-          </label>
-        </section>
-
-        <section className="schemes-table-card">
-          <div className="schemes-table-scroll">
-            <table className="schemes-table">
+        ) : error ? (
+          <div className="browse-message browse-error">
+            <h2>Unable to load schemes</h2>
+            <p>{error}</p>
+            <p>
+              Ensure your FastAPI backend is running at{" "}
+              <code>http://127.0.0.1:8000</code> and that{" "}
+              <code>/schemes/json</code> works.
+            </p>
+            <button
+              className="retry-button"
+              type="button"
+              onClick={() => window.location.reload()}
+            >
+              Try again
+            </button>
+          </div>
+        ) : filteredSchemes.length === 0 ? (
+          <div className="browse-message">
+            <FileText size={30} />
+            <h2>No schemes found</h2>
+            <p>Try another search term.</p>
+          </div>
+        ) : (
+          <div className="scheme-table-wrap">
+            <table className="scheme-table">
               <thead>
                 <tr>
-                  <th>SCHEME_ID</th>
-                  <th>SCHEME_NAME</th>
-                  <th>DEPARTMENT</th>
-                  <th>SCHEME_LEVEL</th>
-                  <th>TARGET_BENEFICIARIES</th>
-                  <th>BUSINESS_STAGE</th>
-                  <th>BUSINESS_TYPE</th>
+                  <th>Scheme ID</th>
+                  <th>Scheme Name</th>
+                  <th>Department</th>
+                  <th>Scheme Level</th>
+                  <th>Details</th>
                 </tr>
               </thead>
 
               <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} className="table-message">
-                      Loading schemes...
-                    </td>
-                  </tr>
-                ) : error ? (
-                  <tr>
-                    <td colSpan={7} className="table-message table-error">
-                      <p>{error}</p>
-                      <button
-                        type="button"
-                        className="retry-button"
-                        onClick={() => window.location.reload()}
+                {filteredSchemes.map((scheme, index) => {
+                  const id = getId(scheme, index);
+                  const expanded = expandedId === id;
+                  const officialLink = getOfficialLink(scheme);
+
+                  return (
+                    <Fragment key={`${id}-${index}`}>
+                      <tr
+                        className={
+                          expanded
+                            ? "scheme-row selected"
+                            : "scheme-row"
+                        }
                       >
-                        Retry
-                      </button>
-                      <p>
-                        Verify that FastAPI is running and GET /schemes
-                        returns a successful response.
-                      </p>
-                    </td>
-                  </tr>
-                ) : filteredSchemes.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="table-message">
-                      {schemes.length === 0
-                        ? "No schemes are available."
-                        : "No schemes match your search."}
-                    </td>
-                  </tr>
-                ) : (
-                  filteredSchemes.map((scheme, index) => (
-                    <tr key={getValue(scheme, "scheme_id") || index}>
-                      <td>{getValue(scheme, "scheme_id") || "—"}</td>
-                      <td>{getValue(scheme, "scheme_name") || "—"}</td>
-                      <td>{getValue(scheme, "department") || "—"}</td>
-                      <td>{getValue(scheme, "scheme_level") || "—"}</td>
-                      <td>
-                        {getValue(scheme, "target_beneficiaries") || "—"}
-                      </td>
-                      <td>{getValue(scheme, "business_stage") || "—"}</td>
-                      <td>{getValue(scheme, "business_type") || "—"}</td>
-                    </tr>
-                  ))
-                )}
+                        <td>
+                          <span className="scheme-id">{id}</span>
+                        </td>
+
+                        <td>
+                          <span className="scheme-name">
+                            {getName(scheme)}
+                          </span>
+                          <span className="scheme-mobile-meta">
+                            {formatValue(
+                              scheme.department || scheme.ministry
+                            )}
+                          </span>
+                        </td>
+
+                        <td>
+                          {formatValue(
+                            scheme.department || scheme.ministry
+                          )}
+                        </td>
+
+                        <td>
+                          <span className="scheme-level">
+                            {formatValue(
+                              scheme.scheme_level || scheme.level
+                            )}
+                          </span>
+                        </td>
+
+                        <td>
+                          <button
+                            className="details-button"
+                            type="button"
+                            onClick={() =>
+                              setExpandedId(expanded ? null : id)
+                            }
+                            aria-expanded={expanded}
+                          >
+                            {expanded ? "Hide" : "View"}
+                            {expanded ? (
+                              <ChevronUp size={16} />
+                            ) : (
+                              <ChevronDown size={16} />
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+
+                      {expanded && (
+                        <tr className="details-row">
+                          <td colSpan={5}>
+                            <div className="scheme-details">
+                              <h3>{getName(scheme)}</h3>
+
+                              <div className="detail-grid">
+                                <div className="detail-item detail-wide">
+                                  <h4>Description</h4>
+                                  <p>
+                                    {formatValue(scheme.description)}
+                                  </p>
+                                </div>
+
+                                <div className="detail-item">
+                                  <h4>Benefits</h4>
+                                  <p>
+                                    {formatValue(scheme.benefits)}
+                                  </p>
+                                </div>
+
+                                <div className="detail-item">
+                                  <h4>Eligibility requirements</h4>
+                                  <p>
+                                    {formatValue(
+                                      scheme.eligibility_rules ??
+                                        scheme.eligibility
+                                    )}
+                                  </p>
+                                </div>
+
+                                <div className="detail-item">
+                                  <h4>Required documents</h4>
+                                  <p>
+                                    {formatValue(
+                                      scheme.required_documents ??
+                                        scheme.documents
+                                    )}
+                                  </p>
+                                </div>
+
+                                <div className="detail-item">
+                                  <h4>Application process</h4>
+                                  <p>
+                                    {formatValue(
+                                      scheme.application_method ??
+                                        scheme.application_process
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {officialLink && (
+                                <a
+                                  className="official-link"
+                                  href={officialLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  Visit Official Source
+                                  <ExternalLink size={15} />
+                                </a>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-        </section>
-      </main>
+        )}
+      </section>
 
-      <SiteFooter />
-    </div>
+      <footer className="browse-footer">
+        <span>CivicEase · Maharashtra</span>
+        <span>
+          Always verify scheme details with the official department.
+        </span>
+        <ChatbotWidget />
+      </footer>
+    </main>
   );
 }
