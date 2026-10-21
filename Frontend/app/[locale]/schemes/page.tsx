@@ -1,6 +1,6 @@
 
 "use client";
-
+import ChatbotWidget from "../../../components/ChatbotWidget";
 import "./schemes.css";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
@@ -109,7 +109,7 @@ export default function BrowseSchemesPage() {
 
         // Read the local JSON dataset, not PostgreSQL.
         const response = await fetch(
-          "http://127.0.0.1:8000/schemes/json",
+          "http://127.0.0.1:8000/schemes",
           {
             signal: controller.signal,
           }
@@ -426,6 +426,7 @@ export default function BrowseSchemesPage() {
         <span>
           Always verify scheme details with the official department.
         </span>
+        <ChatbotWidget />
       </footer>
     </main>
   );
