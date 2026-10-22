@@ -78,7 +78,7 @@ const suppressClick = useRef(false);
       description:
         "Discover government schemes relevant to your profile.",
       button: "Explore My Schemes",
-      href: `/${locale}/schemes`,
+      href: `/${locale}/profile/personal-schemes`,
       icon: Landmark,
     },
     {
