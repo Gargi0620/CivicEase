@@ -1,4 +1,3 @@
-
 "use client";
 import ChatbotWidget from "../../../components/ChatbotWidget";
 import "./schemes.css";

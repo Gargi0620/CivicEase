@@ -1,269 +1,283 @@
-
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
+import { UserRound, Mail, LockKeyhole, Eye, EyeOff } from "lucide-react";
 
 export default function AuthPage() {
   const t = useTranslations("auth");
-  const home = useTranslations("home");
   const locale = useLocale();
-
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
-  const [signupName, setSignupName] = useState("");
-  const [signupEmail, setSignupEmail] = useState("");
-  const [signupPassword, setSignupPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showLoginPassword, setShowLoginPassword] = useState(false);
-  const [showSignupPassword, setShowSignupPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loginMessage, setLoginMessage] = useState("");
-  const [signupMessage, setSignupMessage] = useState("");
-  const [signupError, setSignupError] = useState(false);
-
-  function handleLogin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setLoginMessage(t("loginDemoMessage"));
+  function changeLanguage(nextLocale: string) {
+    window.location.assign(`/${nextLocale}/auth`);
   }
 
-  function handleSignup(event: FormEvent<HTMLFormElement>) {
+  const [isLogin, setIsLogin] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState("");
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSignupMessage("");
-    setSignupError(false);
+    setError("");
 
-    if (signupPassword !== confirmPassword) {
-      setSignupMessage(t("passwordMismatch"));
-      setSignupError(true);
+    if (!isLogin && password !== confirmPassword) {
+      setError(t("passwordMismatch"));
       return;
     }
 
-    if (signupPassword.length < 8) {
-      setSignupMessage(t("passwordTooShort"));
-      setSignupError(true);
-      return;
-    }
+    try {
+      const endpoint = isLogin
+        ? "http://localhost:8000/auth/login"
+        : "http://localhost:8000/auth/signup";
 
-    setSignupMessage(t("signupDemoMessage"));
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        if (response.status === 409) {
+          setError("An account with this email already exists. Please log in.");
+        } else if (response.status === 401) {
+          setError("Incorrect email or password.");
+        } else if (response.status === 422) {
+          setError(
+            "Please enter a valid email and a password of at least 8 characters.",
+          );
+        } else {
+          setError(data.detail || "Something went wrong. Please try again.");
+        }
+        return;
+      }
+
+      // Signup creates the account; login establishes the session.
+      // Sign in after signup so the user can save their profile.
+      if (!isLogin) {
+        const loginResponse = await fetch("http://localhost:8000/auth/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            email: email.trim(),
+            password,
+          }),
+        });
+
+        if (!loginResponse.ok) {
+          setError("Your account was created. Please log in to continue.");
+          setIsLogin(true);
+          setPassword("");
+          setConfirmPassword("");
+          return;
+        }
+      }
+
+      window.location.assign(`/${locale}/profile`);
+    } catch {
+      setError(
+        "Could not connect to CivicEase. Please check that the backend is running.",
+      );
+    }
   }
 
   return (
-    <main className="auth-page">
-      <header className="auth-header">
-        <Link href={`/${locale}`} className="auth-brand">
-          <span className="auth-brand-line">
-            CivicEase
-            <span className="auth-state-label">MAHARASHTRA</span>
-          </span>
-          <span className="auth-tagline">{home("brandSubtitle")}</span>
-        </Link>
+    <main className="civicease-page auth-page">
+      <div className="landing-frame auth-frame">
+        <header className="landing-header">
+          <Link href={`/${locale}`} className="landing-brand">
+            <span className="brand-name">CivicEase</span>
+            <span className="brand-subtitle">MAHARASHTRA</span>
+            <span className="auth-brand-tagline">{t("brandTagline")}</span>
+          </Link>
 
-        <div className="auth-header-actions">
-          <label>
-            <span className="sr-only">{home("language")}</span>
+          <nav className="landing-nav auth-nav" aria-label="Main navigation">
+            <Link href={`/${locale}`} className="nav-link">
+              {t("home")}
+            </Link>
+            <Link href={`/${locale}/schemes`} className="nav-link">
+              {t("exploreSchemes")}
+            </Link>
+            <Link href={`/${locale}#about`} className="nav-link">
+              {t("about")}
+            </Link>
+            <Link
+              href={`/${locale}/auth`}
+              className="nav-link active"
+              aria-current="page"
+            >
+              {t("loginSignup")}
+            </Link>
+          </nav>
+          <div className="auth-language">
+            <label htmlFor="auth-language-select">{t("language")}</label>
+
             <select
-              aria-label={home("language")}
+              id="auth-language-select"
               value={locale}
-              onChange={(event) => {
-                const segments = window.location.pathname.split("/");
-                segments[1] = event.target.value;
-                window.location.assign(segments.join("/"));
-              }}
+              onChange={(event) => changeLanguage(event.target.value)}
             >
               <option value="en">English</option>
               <option value="mr">मराठी</option>
               <option value="hi">हिन्दी</option>
             </select>
-          </label>
+          </div>
+        </header>
 
-          <Link href={`/${locale}`} className="auth-home-link">
-            {t("backHome")}
-          </Link>
-        </div>
-      </header>
+        <section className="auth-main">
+          <div className="auth-card">
+            <h1>{isLogin ? t("loginTitle") : t("signupTitle")}</h1>
 
-      <section className="auth-content">
-        <div className="auth-heading">
-          <p className="auth-eyebrow">{t("eyebrow")}</p>
-          <h1>{t("journeyTitle")}</h1>
-          <p>{t("journeyDescription")}</p>
-        </div>
+            <p className="auth-subtitle">
+              {isLogin ? t("loginSubtitle") : t("signupSubtitle")}
+            </p>
 
-        <div className="auth-card">
-          <section className="auth-panel">
-            <div className="auth-panel-icon" aria-hidden="true">
-              ↗
-            </div>
+            <form className="auth-form" onSubmit={handleSubmit}>
+              {!isLogin && (
+                <div className="auth-field">
+                  <label htmlFor="fullName">{t("fullName")}</label>
+                  <div className="auth-input-wrap">
+                    <UserRound size={16} aria-hidden="true" />
+                    <input
+                      id="fullName"
+                      name="fullName"
+                      type="text"
+                      autoComplete="name"
+                      placeholder={t("fullNamePlaceholder")}
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+              )}
 
-            <h2>{t("welcomeBack")}</h2>
-            <p className="auth-intro">{t("loginDescription")}</p>
-
-            <form className="auth-form" onSubmit={handleLogin}>
-              <label className="auth-field">
-                {t("email")}
-                <input
-                  type="email"
-                  value={loginEmail}
-                  onChange={(event) => setLoginEmail(event.target.value)}
-                  placeholder={t("emailPlaceholder")}
-                  autoComplete="email"
-                  required
-                />
-              </label>
-
-              <label className="auth-field">
-                {t("password")}
-                <span className="auth-password-wrap">
+              <div className="auth-field">
+                <label htmlFor="email">{t("email")}</label>
+                <div className="auth-input-wrap">
+                  <Mail size={16} aria-hidden="true" />
                   <input
-                    type={showLoginPassword ? "text" : "password"}
-                    value={loginPassword}
-                    onChange={(event) => setLoginPassword(event.target.value)}
-                    placeholder={t("passwordPlaceholder")}
-                    autoComplete="current-password"
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder={t("emailPlaceholder")}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     required
                   />
-                  <button
-                    type="button"
-                    className="auth-password-toggle"
-                    onClick={() => setShowLoginPassword((current) => !current)}
-                    aria-label={
-                      showLoginPassword ? t("hidePassword") : t("showPassword")
-                    }
-                  >
-                    {showLoginPassword ? t("hide") : t("show")}
-                  </button>
-                </span>
-              </label>
-
-              <div className="auth-form-note">
-                <span>{t("secureAccess")}</span>
+                </div>
               </div>
 
-              <button type="submit" className="auth-submit">
-                {t("loginButton")} <span aria-hidden="true">→</span>
-              </button>
-
-              {loginMessage && (
-                <p className="auth-status" role="status">
-                  {loginMessage}
-                </p>
-              )}
-            </form>
-
-            <p className="auth-panel-footer">{t("newUser")}</p>
-          </section>
-
-          <section className="auth-panel auth-signup-panel">
-            <div className="auth-panel-icon" aria-hidden="true">
-              +
-            </div>
-
-            <h2>{t("createAccount")}</h2>
-            <p className="auth-intro">{t("signupDescription")}</p>
-
-            <form className="auth-form" onSubmit={handleSignup}>
-              <label className="auth-field">
-                {t("fullName")}
-                <input
-                  type="text"
-                  value={signupName}
-                  onChange={(event) => setSignupName(event.target.value)}
-                  placeholder={t("namePlaceholder")}
-                  autoComplete="name"
-                  required
-                />
-              </label>
-
-              <label className="auth-field">
-                {t("email")}
-                <input
-                  type="email"
-                  value={signupEmail}
-                  onChange={(event) => setSignupEmail(event.target.value)}
-                  placeholder={t("emailPlaceholder")}
-                  autoComplete="email"
-                  required
-                />
-              </label>
-
-              <label className="auth-field">
-                {t("createPassword")}
-                <span className="auth-password-wrap">
+              <div className="auth-field">
+                <label htmlFor="password">{t("password")}</label>
+                <div className="auth-input-wrap">
+                  <LockKeyhole size={16} aria-hidden="true" />
                   <input
-                    type={showSignupPassword ? "text" : "password"}
-                    value={signupPassword}
-                    onChange={(event) => setSignupPassword(event.target.value)}
-                    placeholder={t("minimumPassword")}
-                    autoComplete="new-password"
-                    minLength={8}
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete={isLogin ? "current-password" : "new-password"}
+                    placeholder={t("passwordPlaceholder")}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     required
                   />
                   <button
                     type="button"
-                    className="auth-password-toggle"
-                    onClick={() => setShowSignupPassword((current) => !current)}
+                    className="auth-eye"
+                    onClick={() => setShowPassword((previous) => !previous)}
                     aria-label={
-                      showSignupPassword ? t("hidePassword") : t("showPassword")
+                      showPassword ? t("hidePassword") : t("showPassword")
                     }
                   >
-                    {showSignupPassword ? t("hide") : t("show")}
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
-                </span>
-              </label>
+                </div>
+              </div>
 
-              <label className="auth-field">
-                {t("confirmPassword")}
-                <span className="auth-password-wrap">
-                  <input
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={confirmPassword}
-                    onChange={(event) => setConfirmPassword(event.target.value)}
-                    placeholder={t("confirmPasswordPlaceholder")}
-                    autoComplete="new-password"
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="auth-password-toggle"
-                    onClick={() =>
-                      setShowConfirmPassword((current) => !current)
-                    }
-                    aria-label={
-                      showConfirmPassword ? t("hidePassword") : t("showPassword")
-                    }
-                  >
-                    {showConfirmPassword ? t("hide") : t("show")}
-                  </button>
-                </span>
-              </label>
+              {!isLogin && (
+                <div className="auth-field">
+                  <label htmlFor="confirmPassword">
+                    {t("confirmPassword")}
+                  </label>
+                  <div className="auth-input-wrap">
+                    <LockKeyhole size={16} aria-hidden="true" />
+                    <input
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      type={showConfirmPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      placeholder={t("passwordPlaceholder")}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="auth-eye"
+                      onClick={() =>
+                        setShowConfirmPassword((previous) => !previous)
+                      }
+                      aria-label={
+                        showConfirmPassword
+                          ? t("hidePassword")
+                          : t("showPassword")
+                      }
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff size={16} />
+                      ) : (
+                        <Eye size={16} />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
 
-              <button type="submit" className="auth-submit">
-                {t("signupButton")} <span aria-hidden="true">→</span>
-              </button>
-
-              {signupMessage && (
-                <p
-                  className={`auth-status ${signupError ? "auth-status-error" : ""}`}
-                  role="status"
-                >
-                  {signupMessage}
+              {error && (
+                <p className="auth-error" role="alert">
+                  {error}
                 </p>
               )}
+
+              <button type="submit" className="auth-submit">
+                {isLogin ? t("loginButton") : t("signupButton")}
+              </button>
             </form>
 
-            <p className="auth-panel-footer">{t("signupFooter")}</p>
-          </section>
-        </div>
-      </section>
+            <p className="auth-switch">
+              {isLogin ? t("noAccount") : t("haveAccount")}{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLogin((previous) => !previous);
+                  setError("");
+                }}
+              >
+                {isLogin ? t("signupLink") : t("loginLink")}
+              </button>
+            </p>
+          </div>
+        </section>
 
-      <footer className="auth-footer">
-        <span>CivicEase Maharashtra</span>
-        <span>{t("footerText")}</span>
-        <Link href={`/${locale}/schemes`}>
-          {home("exploreSchemes")} →
-        </Link>
-      </footer>
+        <footer className="auth-footer">{t("copyright")}</footer>
+      </div>
     </main>
   );
 }

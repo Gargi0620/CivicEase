@@ -436,3 +436,165 @@
     flex-direction: column;
   }
 }
+
+/* ===== CivicEase Explore Schemes layout fix ===== */
+
+.page-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f8f5f0;
+  color: #382035;
+}
+
+.schemes-main {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 48px clamp(20px, 5vw, 72px);
+  flex: 1;
+  box-sizing: border-box;
+}
+
+.schemes-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.schemes-heading h1 {
+  margin: 0 0 12px;
+  font-size: clamp(30px, 4vw, 44px);
+  line-height: 1.2;
+}
+
+.schemes-heading p {
+  max-width: 760px;
+  margin: 0;
+  line-height: 1.7;
+}
+
+.scheme-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, 360px);
+  min-height: 46px;
+  padding: 0 14px;
+  border: 1px solid #e4d9df;
+  border-radius: 12px;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.scheme-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+}
+
+.schemes-table-card {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid #eadfe4;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.schemes-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.schemes-table {
+  width: 100%;
+  min-width: 1000px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.schemes-table th,
+.schemes-table td {
+  padding: 16px;
+  border-bottom: 1px solid #eee7e9;
+  vertical-align: top;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.schemes-table th {
+  background: #f4edf0;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  white-space: normal;
+}
+
+.schemes-table td {
+  font-size: 14px;
+}
+
+.schemes-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table-message {
+  padding: 28px !important;
+  text-align: center;
+}
+
+.table-error {
+  color: #a52626;
+}
+
+.retry-button {
+  display: inline-block;
+  margin: 12px;
+  padding: 9px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: #50334b;
+  color: #fff;
+  cursor: pointer;
+}
+
+.landing-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 28px clamp(20px, 5vw, 72px);
+  background: #fcf9f4;
+  box-sizing: border-box;
+}
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+@media (max-width: 700px) {
+  .schemes-main {
+    padding: 30px 16px;
+  }
+
+  .schemes-heading {
+    align-items: stretch;
+  }
+
+  .scheme-search {
+    width: 100%;
+  }
+
+  .landing-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
