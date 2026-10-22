@@ -5,11 +5,15 @@ import os
 from pathlib import Path
 
 import psycopg
+from psycopg.types.json import Jsonb
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from openai import OpenAI
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
+from pwdlib import PasswordHash
+
 
 from app.Database import get_connection
 from app.Rules import check_scheme_eligibility
@@ -25,6 +29,17 @@ SCHEMES_FILE = BACKEND_DIR / "data" / "schemes.json"
 load_dotenv(BACKEND_DIR / ".env")
 
 app = FastAPI(title="CivicEase API")
+password_hash = PasswordHash.recommended()
+
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.environ["SESSION_SECRET"],
+    session_cookie="civicease_session",
+    same_site="lax",
+    https_only=False,  # Local development only before deploying publicly switch to only
+    max_age=60 * 60 * 24 * 7,  # 7 days
+)
+
 
 
 # --------------------------------------------------
@@ -84,6 +99,15 @@ def load_schemes():
 class UserProfile(BaseModel):
     details: dict
 
+class SignupRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=128)
+
 
 class ChatMessage(BaseModel):
     role: str
@@ -95,6 +119,231 @@ class ChatRequest(BaseModel):
     language: str = "en"
     page: str = "/"
     history: list[ChatMessage] = Field(default_factory=list)
+
+
+# --------------------------------------------------
+# Authentication endpoints
+# --------------------------------------------------
+
+@app.post("/auth/signup", status_code=201)
+def signup(data: SignupRequest):
+    email = str(data.email).strip().lower()
+    hashed_password = password_hash.hash(data.password)
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO users (email, password_hash)
+                    VALUES (%s, %s)
+                    RETURNING user_id, email
+                    """,
+                    (email, hashed_password),
+                )
+                user = cur.fetchone()
+
+        return {
+            "message": "Account created successfully.",
+            "user": {
+                "user_id": user["user_id"],
+                "email": user["email"],
+            },
+        }
+
+    except psycopg.errors.UniqueViolation:
+        raise HTTPException(
+            status_code=409,
+            detail="An account with this email already exists.",
+        )
+    except psycopg.Error:
+        logging.exception("Signup database operation failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Could not create the account.",
+        )
+
+
+@app.post("/auth/login")
+def login(data: LoginRequest, request: Request):
+    email = str(data.email).strip().lower()
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT user_id, email, password_hash
+                    FROM users
+                    WHERE email = %s
+                    """,
+                    (email,),
+                )
+                user = cur.fetchone()
+
+    except psycopg.Error:
+        logging.exception("Login database operation failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Could not log in right now.",
+        )
+
+    if not user or not password_hash.verify(
+        data.password, user["password_hash"]
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password.",
+        )
+
+    request.session.clear()
+    request.session["user_id"] = user["user_id"]
+
+    return {
+        "message": "Login successful.",
+        "user": {
+            "user_id": user["user_id"],
+            "email": user["email"],
+        },
+    }
+
+
+@app.get("/auth/me")
+def current_user(request: Request):
+    user_id = request.session.get("user_id")
+
+    if user_id is None:
+        raise HTTPException(
+            status_code=401,
+            detail="You are not logged in.",
+        )
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT user_id, email
+                    FROM users
+                    WHERE user_id = %s
+                    """,
+                    (user_id,),
+                )
+                user = cur.fetchone()
+
+    except psycopg.Error:
+        logging.exception("Session user lookup failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Could not verify the session.",
+        )
+
+    if not user:
+        request.session.clear()
+        raise HTTPException(
+            status_code=401,
+            detail="Your account could not be found.",
+        )
+
+    return {"user": user}
+
+
+@app.post("/auth/logout")
+def logout(request: Request, response: Response):
+    request.session.clear()
+    response.delete_cookie(
+        key="civicease_session",
+        path="/",
+        httponly=True,
+        secure=False,  # Local development only
+        samesite="lax",
+    )
+    return {"message": "Logged out successfully."}
+
+
+# --------------------------------------------------
+# User profile: save and retrieve questionnaire answers
+# --------------------------------------------------
+
+@app.get("/profile")
+def get_profile(request: Request):
+    user_id = request.session.get("user_id")
+
+    if user_id is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Please log in to view your profile.",
+        )
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT details, updated_at
+                    FROM user_profiles
+                    WHERE user_id = %s
+                    """,
+                    (user_id,),
+                )
+                profile = cur.fetchone()
+
+        if profile is None:
+            return {"details": {}, "saved": False}
+
+        return {
+            "details": profile["details"],
+            "saved": True,
+            "updated_at": profile["updated_at"],
+        }
+
+    except psycopg.Error:
+        logging.exception("Could not retrieve user profile")
+        raise HTTPException(
+            status_code=500,
+            detail="Could not retrieve your profile.",
+        )
+
+
+@app.put("/profile")
+def save_profile(profile: UserProfile, request: Request):
+    user_id = request.session.get("user_id")
+
+    if user_id is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Please log in to save your profile.",
+        )
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO user_profiles (user_id, details)
+                    VALUES (%s, %s)
+                    ON CONFLICT (user_id)
+                    DO UPDATE SET
+                        details = EXCLUDED.details,
+                        updated_at = NOW()
+                    RETURNING details, updated_at
+                    """,
+                    (user_id, Jsonb(profile.details)),
+                )
+                saved_profile = cur.fetchone()
+
+        return {
+            "message": "Profile saved successfully.",
+            "details": saved_profile["details"],
+            "updated_at": saved_profile["updated_at"],
+        }
+
+    except psycopg.Error:
+        logging.exception("Could not save user profile")
+        raise HTTPException(
+            status_code=500,
+            detail="Could not save your profile.",
+        )
 
 
 # --------------------------------------------------

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -58,18 +57,45 @@ export default function ReviewProfilePage() {
     }
   }, []);
 
-  function saveProfile() {
-    try {
-      sessionStorage.setItem(
-        "civiceaseProfile",
-        JSON.stringify(answers)
-      );
+  async function saveProfile() {
+    setMessage("Saving your profile...");
 
-      // Mark the profile as completed for this browser session.
+    try {
+      const response = await fetch("http://localhost:8000/profile", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          details: answers,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (response.status === 401) {
+        setMessage("Please log in before saving your profile.");
+        return;
+      }
+
+      if (!response.ok) {
+        setMessage(
+          data.detail || "Unable to save your profile. Please try again.",
+        );
+        return;
+      }
+
+      // Keep the browser copy for the existing questionnaire pages.
+      sessionStorage.setItem("civiceaseProfile", JSON.stringify(answers));
       sessionStorage.setItem("civiceaseProfileCompleted", "true");
-      setMessage("Your profile has been saved for this session.");
+
+      setMessage("Profile saved successfully to your account!");
+window.location.assign(`/${locale}/schemes`);
     } catch {
-      setMessage("Unable to save your profile. Please try again.");
+      setMessage(
+        "Could not connect to the backend. Please check that it is running.",
+      );
     }
   }
 
@@ -137,9 +163,7 @@ export default function ReviewProfilePage() {
           {/* Progress */}
           <div className="mb-8">
             <div className="mb-3 flex items-center justify-between gap-4 text-sm">
-              <span className="font-semibold text-[#512b50]">
-                Step 5 of 5
-              </span>
+              <span className="font-semibold text-[#512b50]">Step 5 of 5</span>
               <span className="text-[#806d7e]">100% completed</span>
             </div>
 
@@ -209,7 +233,7 @@ export default function ReviewProfilePage() {
                 "Business type",
                 answers.businessType === "Other"
                   ? answers.otherBusiness
-                  : answers.businessType
+                  : answers.businessType,
               )}
             </section>
 
@@ -232,7 +256,7 @@ export default function ReviewProfilePage() {
                 "Applicant type",
                 answers.applicantType === "Other"
                   ? answers.otherApplicantType
-                  : answers.applicantType
+                  : answers.applicantType,
               )}
               {reviewRow("Business ownership", answers.ownershipType)}
               {reviewRow("Beneficiary category", answers.beneficiaryCategory)}

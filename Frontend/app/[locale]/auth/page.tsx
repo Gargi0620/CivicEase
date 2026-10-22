@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -10,10 +9,8 @@ export default function AuthPage() {
   const t = useTranslations("auth");
   const locale = useLocale();
   function changeLanguage(nextLocale: string) {
-  window.location.assign(
-    `/${nextLocale}/auth`
-  );
- }
+    window.location.assign(`/${nextLocale}/auth`);
+  }
 
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
@@ -24,23 +21,80 @@ export default function AuthPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-  event.preventDefault();
-  setError("");
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
 
-  if (!isLogin) {
-    if (password !== confirmPassword) {
+    if (!isLogin && password !== confirmPassword) {
       setError(t("passwordMismatch"));
       return;
     }
 
-    window.location.assign(`/${locale}/profile`);
-    return;
-  }
+    try {
+      const endpoint = isLogin
+        ? "http://localhost:8000/auth/login"
+        : "http://localhost:8000/auth/signup";
 
-  // Login will be connected to the backend later.
-  setError(t("notConnected"));
-}
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        if (response.status === 409) {
+          setError("An account with this email already exists. Please log in.");
+        } else if (response.status === 401) {
+          setError("Incorrect email or password.");
+        } else if (response.status === 422) {
+          setError(
+            "Please enter a valid email and a password of at least 8 characters.",
+          );
+        } else {
+          setError(data.detail || "Something went wrong. Please try again.");
+        }
+        return;
+      }
+
+      // Signup creates the account; login establishes the session.
+      // Sign in after signup so the user can save their profile.
+      if (!isLogin) {
+        const loginResponse = await fetch("http://localhost:8000/auth/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            email: email.trim(),
+            password,
+          }),
+        });
+
+        if (!loginResponse.ok) {
+          setError("Your account was created. Please log in to continue.");
+          setIsLogin(true);
+          setPassword("");
+          setConfirmPassword("");
+          return;
+        }
+      }
+
+      window.location.assign(`/${locale}/profile`);
+    } catch {
+      setError(
+        "Could not connect to CivicEase. Please check that the backend is running.",
+      );
+    }
+  }
 
   return (
     <main className="civicease-page auth-page">
@@ -71,20 +125,18 @@ export default function AuthPage() {
             </Link>
           </nav>
           <div className="auth-language">
-            <label htmlFor="auth-language-select">
-               {t("language")}
-            </label>
+            <label htmlFor="auth-language-select">{t("language")}</label>
 
             <select
-                id="auth-language-select"
-                value={locale}
-                onChange={(event) => changeLanguage(event.target.value)}
+              id="auth-language-select"
+              value={locale}
+              onChange={(event) => changeLanguage(event.target.value)}
             >
-             <option value="en">English</option>
-             <option value="mr">मराठी</option>
-             <option value="hi">हिन्दी</option>
+              <option value="en">English</option>
+              <option value="mr">मराठी</option>
+              <option value="hi">हिन्दी</option>
             </select>
-         </div>
+          </div>
         </header>
 
         <section className="auth-main">
@@ -150,7 +202,9 @@ export default function AuthPage() {
                     type="button"
                     className="auth-eye"
                     onClick={() => setShowPassword((previous) => !previous)}
-                    aria-label={showPassword ? t("hidePassword") : t("showPassword")}
+                    aria-label={
+                      showPassword ? t("hidePassword") : t("showPassword")
+                    }
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
