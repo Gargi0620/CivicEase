@@ -71,6 +71,7 @@ export default function ReviewProfilePage() {
     } catch {
       setMessage("Unable to save your profile. Please try again.");
     }
+    window.location.assign(`/${locale}/profile/dashboard`);
   }
 
   const locationLabel =
