@@ -12,8 +12,6 @@ from openai import OpenAI
 from pydantic import BaseModel, Field
 
 from app.Database import get_connection
-from app.Rules import check_scheme_eligibility
-
 from app.Rules import (
     check_scheme_eligibility,
     profile_matches_scheme,
@@ -51,7 +49,8 @@ app.add_middleware(
 
 
 # --------------------------------------------------
-# Shared scheme data loader
+# Shared JSON scheme data loader
+# Used by the chatbot and JSON endpoint
 # --------------------------------------------------
 
 def load_schemes():
@@ -64,6 +63,7 @@ def load_schemes():
     try:
         with SCHEMES_FILE.open("r", encoding="utf-8") as file:
             schemes = json.load(file)
+
     except (json.JSONDecodeError, OSError):
         raise HTTPException(
             status_code=500,
@@ -126,7 +126,11 @@ def get_schemes():
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT * FROM schemes ORDER BY scheme_id"
+                    """
+                    SELECT *
+                    FROM public.schemes
+                    ORDER BY scheme_id
+                    """
                 )
                 schemes = cur.fetchall()
 
@@ -145,6 +149,7 @@ def get_schemes():
 
 # --------------------------------------------------
 # PostgreSQL: search schemes
+# Keep this static route before /schemes/{scheme_id}
 # --------------------------------------------------
 
 @app.get("/schemes/search")
@@ -155,7 +160,7 @@ def search_schemes(q: str):
                 cur.execute(
                     """
                     SELECT *
-                    FROM schemes
+                    FROM public.schemes
                     WHERE scheme_name ILIKE %s
                        OR benefits ILIKE %s
                     ORDER BY scheme_id
@@ -190,7 +195,7 @@ def match_schemes(stage: str, business_type: str):
                 cur.execute(
                     """
                     SELECT *
-                    FROM schemes
+                    FROM public.schemes
                     WHERE business_stage ILIKE %s
                       AND business_type ILIKE %s
                     ORDER BY scheme_id
@@ -216,16 +221,53 @@ def match_schemes(stage: str, business_type: str):
         )
 
 
+# --------------------------------------------------
+# PostgreSQL: retrieve one scheme by ID
+# --------------------------------------------------
+
+@app.get("/schemes/{scheme_id}")
+def get_scheme_by_id(scheme_id: str):
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT *
+                    FROM public.schemes
+                    WHERE scheme_id::text = %s
+                    """,
+                    (scheme_id,),
+                )
+                scheme = cur.fetchone()
+
+        if scheme is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Scheme not found.",
+            )
+
+        return dict(scheme)
+
+    except HTTPException:
+        raise
+
+    except psycopg.Error:
+        logging.exception("Could not retrieve scheme by ID")
+        raise HTTPException(
+            status_code=500,
+            detail="Could not retrieve scheme from the database.",
+        )
+
 
 # --------------------------------------------------
-# PostgreSQL-based personalised eligibility matching
+# PostgreSQL: personalised eligibility matching
 # --------------------------------------------------
+
 
 @app.post("/eligibility-check")
 def eligibility_check(profile: UserProfile):
     answers = profile.details or {}
 
-    # Map questionnaire values to stable backend field names.
     applicant_profile = {
         **answers,
         "business_stage": answers.get("stage"),
@@ -261,9 +303,7 @@ def eligibility_check(profile: UserProfile):
                 schemes = cur.fetchall()
 
     except psycopg.Error:
-        logging.exception(
-            "Could not retrieve schemes for eligibility matching"
-        )
+        logging.exception("Could not retrieve schemes for eligibility matching")
         raise HTTPException(
             status_code=500,
             detail="Could not retrieve schemes for matching.",
@@ -271,23 +311,18 @@ def eligibility_check(profile: UserProfile):
 
     results = []
 
-    for scheme in schemes:
-        scheme = dict(scheme)
+    for raw_scheme in schemes:
+        scheme = dict(raw_scheme)
+        scheme_id = str(scheme.get("scheme_id", ""))
         rules = scheme.get("eligibility_rules")
 
-        # If structured rules exist, use them for eligibility evaluation.
+        # Full scoring for schemes with structured rules.
         if rules:
-            evaluation_scheme = {
-                **scheme,
-                "eligibility_rules": rules,
-            }
-
             evaluation = check_scheme_eligibility(
                 applicant_profile,
-                evaluation_scheme,
+                {**scheme, "eligibility_rules": rules},
             )
 
-            # Never recommend a scheme that has a definite failed rule.
             if evaluation["status"] == "not_eligible":
                 continue
 
@@ -297,45 +332,65 @@ def eligibility_check(profile: UserProfile):
                 "match_type": "rule_based",
                 "match_reasons": [
                     item["reason"]
-                    for item in evaluation["passed_rules"]
+                    for item in evaluation.get("passed_rules", [])
                 ],
             })
+            continue
 
-        else:
-            # Until verified structured rules exist, show only schemes
-            # with a preliminary business-profile match.
-            matched, reasons = profile_matches_scheme(
-                applicant_profile,
-                scheme,
-            )
+        # Preliminary matching for schemes without structured rules.
+        matched, reasons = profile_matches_scheme(
+            applicant_profile,
+            scheme,
+        )
 
-            if not matched:
-                continue
+        if not matched:
+            continue
 
-            results.append({
-                **scheme,
-                "status": "needs_review",
-                "eligible": None,
-                "match_type": "preliminary",
-                "match_reasons": reasons,
-                "passed_rules": [],
-                "failed_rules": [],
-                "missing_rules": [],
-                "review_rules": [{
-                    "field": "eligibility_rules",
-                    "reason": (
-                        "This is a preliminary profile match. "
-                        "Scheme-specific eligibility rules still need "
-                        "verification."
-                    ),
-                }],
-            })
+        # Demo placeholder: only MH002 receives its full assessment
+        # once its structured rules have been added to PostgreSQL.
+        # Other preliminary matches receive a clearly labelled
+        # placeholder, not a calculated eligibility score.
+        is_prototype_scheme = scheme_id == "MH002"
+
+        results.append({
+            **scheme,
+            "status": "needs_review",
+            "eligible": None,
+            "match_percentage": None if is_prototype_scheme else 70,
+            "score_type": (
+                "awaiting_rules"
+                if is_prototype_scheme
+                else "demo_placeholder"
+            ),
+            "score_label": (
+                "Assessment pending"
+                if is_prototype_scheme
+                else "Preliminary profile match · Demo estimate"
+            ),
+            "matched_count": 0,
+            "unknown_count": None,
+            "unmatched_count": None,
+            "total_requirements": None,
+            "match_type": "preliminary",
+            "match_reasons": reasons,
+            "passed_rules": [],
+            "failed_rules": [],
+            "missing_rules": [],
+            "review_rules": [{
+                "field": "eligibility_rules",
+                "reason": (
+                    "Structured eligibility rules are not configured "
+                    "for this scheme yet."
+                ),
+            }],
+        })
 
     return {
         "total_schemes_checked": len(schemes),
         "total_matches": len(results),
         "results": results,
     }
+
 
 
 # --------------------------------------------------
@@ -366,7 +421,7 @@ def chat(request: ChatRequest):
             detail="GROQ_API_KEY is missing from Backend/.env",
         )
 
-    # Load scheme data without requiring PostgreSQL.
+    # Keep the chatbot's existing JSON-based data source.
     schemes = load_schemes()
 
     language_names = {
@@ -380,7 +435,6 @@ def chat(request: ChatRequest):
         "the language used by the user",
     )
 
-    # Keep recent, valid conversation messages.
     history = []
 
     for item in request.history[-8:]:
@@ -415,7 +469,7 @@ person's eligibility unless that action actually occurred.
 
     user_input = f"""
 AVAILABLE GOVERNMENT SCHEME DATA:
-{json.dumps(schemes, ensure_ascii=False)}
+{json.dumps(schemes, ensure_ascii=False, default=str)}
 
 CURRENT USER QUESTION:
 {request.message}
@@ -457,7 +511,6 @@ Answer the current question using the scheme data above.
 
     except Exception:
         logging.exception("CivicEase chat request failed")
-
         raise HTTPException(
             status_code=502,
             detail="The chatbot could not generate a response.",
