@@ -13,6 +13,7 @@ import {
   UserRound,
   X,
   ChevronDown,
+  RefreshCw,
 } from "lucide-react";
 
 type Scheme = Record<string, unknown>;
@@ -27,10 +28,7 @@ function textValue(value: unknown): string {
   return String(value);
 }
 
-function getField(
-  scheme: Scheme,
-  ...keys: string[]
-): string {
+function getField(scheme: Scheme, ...keys: string[]): string {
   for (const key of keys) {
     const value = scheme[key];
     if (value !== null && value !== undefined && value !== "") {
@@ -38,6 +36,24 @@ function getField(
     }
   }
   return "—";
+}
+
+function getStatus(scheme: Scheme): string {
+  return String(scheme.status || "needs_review");
+}
+
+function statusLabel(status: string): string {
+  switch (status) {
+    case "eligible":
+      return "Matches configured rules";
+    case "not_eligible":
+      return "Does not meet criteria";
+    case "needs_more_information":
+      return "More information needed";
+    case "needs_review":
+    default:
+      return "Preliminary match";
+  }
 }
 
 export default function PersonalisedSchemesPage() {
@@ -52,11 +68,11 @@ export default function PersonalisedSchemesPage() {
   const [levelFilter, setLevelFilter] = useState("all");
   const [departmentFilter, setDepartmentFilter] = useState("all");
 
-  // Draggable chatbot state
   const [chatPosition, setChatPosition] = useState<{
     x: number;
     y: number;
   } | null>(null);
+
   const dragOffset = useRef({ x: 0, y: 0 });
   const dragging = useRef(false);
 
@@ -65,30 +81,50 @@ export default function PersonalisedSchemesPage() {
     setError("");
 
     try {
-      const response = await fetch(`${API_BASE}/schemes`, {
+      const savedProfile = sessionStorage.getItem("civiceaseProfile");
+
+      if (!savedProfile) {
+        throw new Error(
+          "Please complete your questionnaire before viewing personalised schemes."
+        );
+      }
+
+      const profile = JSON.parse(savedProfile);
+
+      const response = await fetch(`${API_BASE}/eligibility-check`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          details: profile,
+        }),
         cache: "no-store",
       });
 
       if (!response.ok) {
-        throw new Error("Unable to load schemes from the database.");
+        const errorData = await response.json().catch(() => null);
+        throw new Error(
+          errorData?.detail ||
+            "Unable to match schemes to your profile."
+        );
       }
 
       const data = await response.json();
 
-      const rows = Array.isArray(data)
-        ? data
-        : Array.isArray(data.schemes)
-          ? data.schemes
-          : Array.isArray(data.results)
-            ? data.results
-            : [];
+      if (!Array.isArray(data.results)) {
+        throw new Error(
+          "The matching API returned an unexpected response."
+        );
+      }
 
-      setSchemes(rows);
+      setSchemes(data.results);
     } catch (err) {
+      setSchemes([]);
       setError(
         err instanceof Error
           ? err.message
-          : "Unable to load schemes. Please try again.",
+          : "Unable to load personalised schemes. Please try again."
       );
     } finally {
       setLoading(false);
@@ -104,13 +140,11 @@ export default function PersonalisedSchemesPage() {
       Array.from(
         new Set(
           schemes
-            .map((s) =>
-              getField(s, "scheme_level", "level"),
-            )
-            .filter((v) => v !== "—"),
-        ),
+            .map((s) => getField(s, "scheme_level", "level"))
+            .filter((v) => v !== "—")
+        )
       ),
-    [schemes],
+    [schemes]
   );
 
   const departments = useMemo(
@@ -119,42 +153,40 @@ export default function PersonalisedSchemesPage() {
         new Set(
           schemes
             .map((s) =>
-              getField(s, "department", "department_name", "ministry"),
+              getField(s, "department", "department_name", "ministry")
             )
-            .filter((v) => v !== "—"),
-        ),
+            .filter((v) => v !== "—")
+        )
       ),
-    [schemes],
+    [schemes]
   );
 
   const filteredSchemes = useMemo(() => {
     const term = search.trim().toLowerCase();
 
     return schemes.filter((scheme) => {
-      const name = getField(
-        scheme,
-        "scheme_name",
-        "name",
-        "title",
-      );
+      const name = getField(scheme, "scheme_name", "name", "title");
       const department = getField(
         scheme,
         "department",
         "department_name",
-        "ministry",
+        "ministry"
       );
       const level = getField(scheme, "scheme_level", "level");
       const benefits = getField(scheme, "benefits", "description");
       const eligibility = getField(
         scheme,
         "eligibility_criteria",
-        "eligibility_rules",
-        "target_beneficiaries",
+        "target_beneficiaries"
       );
+
+      const reasons = Array.isArray(scheme.match_reasons)
+        ? scheme.match_reasons.map(String).join(" ")
+        : "";
 
       const matchesSearch =
         !term ||
-        [name, department, level, benefits, eligibility]
+        [name, department, level, benefits, eligibility, reasons]
           .some((value) => value.toLowerCase().includes(term));
 
       const matchesLevel =
@@ -169,7 +201,7 @@ export default function PersonalisedSchemesPage() {
   }, [schemes, search, levelFilter, departmentFilter]);
 
   function startDragging(
-    event: React.PointerEvent<HTMLButtonElement>,
+    event: React.PointerEvent<HTMLButtonElement>
   ) {
     if (event.button !== 0) return;
 
@@ -185,7 +217,7 @@ export default function PersonalisedSchemesPage() {
   }
 
   function moveChatbot(
-    event: React.PointerEvent<HTMLButtonElement>,
+    event: React.PointerEvent<HTMLButtonElement>
   ) {
     if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
 
@@ -193,14 +225,8 @@ export default function PersonalisedSchemesPage() {
     const dy = event.clientY - dragOffset.current.y;
 
     if (
-      Math.abs(
-        event.clientX -
-          (chatPosition?.x ?? window.innerWidth - 78),
-      ) > 5 ||
-      Math.abs(
-        event.clientY -
-          (chatPosition?.y ?? window.innerHeight - 78),
-      ) > 5
+      Math.abs(event.movementX) > 2 ||
+      Math.abs(event.movementY) > 2
     ) {
       dragging.current = true;
     }
@@ -209,10 +235,6 @@ export default function PersonalisedSchemesPage() {
       x: Math.max(8, Math.min(dx, window.innerWidth - 68)),
       y: Math.max(8, Math.min(dy, window.innerHeight - 68)),
     });
-  }
-
-  function stopDragging() {
-    // Keep the final position. A subsequent click opens the chatbot.
   }
 
   function openChatbot() {
@@ -226,7 +248,6 @@ export default function PersonalisedSchemesPage() {
 
   return (
     <main className="civicease-page min-h-screen w-full flex flex-col overflow-x-hidden bg-[#fcf8f0] text-[#512b50]">
-      {/* Header */}
       <header className="w-full border-b border-[#eee5dc] bg-[#fffaf3]">
         <div className="mx-auto flex min-h-[76px] max-w-[1500px] flex-wrap items-center justify-between gap-4 px-5 py-3 sm:px-10">
           <Link href={`/${locale}`} className="shrink-0">
@@ -272,20 +293,15 @@ export default function PersonalisedSchemesPage() {
           </nav>
 
           <Link
-  href={`/${locale}/profile/dashboard`}
-  aria-label="Profile"
-  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#512b50] text-white"
->
-  <UserRound
-    size={22}
-    color="#FFFFFF"
-    strokeWidth={2.5}
-  />
-</Link>
+            href={`/${locale}/profile/dashboard`}
+            aria-label="Profile"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#512b50] text-white"
+          >
+            <UserRound size={22} />
+          </Link>
         </div>
       </header>
 
-      {/* Main content */}
       <section className="mx-auto flex w-full max-w-[1500px] flex-1 flex-col px-5 py-7 sm:px-10 sm:py-9">
         <div className="mb-5 rounded-xl bg-[#f7f1e7] p-5 sm:p-7">
           <div className="flex flex-wrap items-start justify-between gap-5">
@@ -298,7 +314,9 @@ export default function PersonalisedSchemesPage() {
               </p>
               <p className="mt-5 flex items-center gap-2 text-sm font-medium">
                 <UserRound size={18} />
-                Schemes selected for you
+                {loading
+                  ? "Finding schemes for you..."
+                  : `${filteredSchemes.length} matching schemes`}
               </p>
             </div>
 
@@ -345,6 +363,16 @@ export default function PersonalisedSchemesPage() {
                 size={15}
                 className={showFilters ? "rotate-180" : ""}
               />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void fetchSchemes()}
+              disabled={loading}
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-[#c5a0b9] bg-white px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
+            >
+              <RefreshCw size={16} />
+              Refresh
             </button>
           </div>
 
@@ -399,14 +427,24 @@ export default function PersonalisedSchemesPage() {
           )}
         </div>
 
-        {/* Dynamic table: no hardcoded scheme rows */}
+        {!loading && !error && schemes.length > 0 && (
+          <p className="mb-3 text-sm text-[#65555f]">
+            These are preliminary profile matches unless a scheme has
+            verified structured eligibility rules. A match does not
+            guarantee government approval.
+          </p>
+        )}
+
         <div className="min-h-[420px] flex-1 overflow-hidden rounded-xl border border-[#eee5dc] bg-white shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+            <table className="w-full min-w-[1000px] border-collapse text-left text-sm">
               <thead className="bg-[#f7f2e9] text-xs uppercase tracking-wide text-[#65435e]">
                 <tr>
                   <th className="border-r border-[#eee5dc] px-4 py-4">
                     Scheme name
+                  </th>
+                  <th className="border-r border-[#eee5dc] px-4 py-4">
+                    Match status
                   </th>
                   <th className="border-r border-[#eee5dc] px-4 py-4">
                     Department
@@ -427,18 +465,15 @@ export default function PersonalisedSchemesPage() {
               <tbody>
                 {loading && (
                   <tr>
-                    <td
-                      colSpan={6}
-                      className="h-24 px-4 text-center text-[#796a79]"
-                    >
-                      Loading schemes...
+                    <td colSpan={7} className="h-24 px-4 text-center text-[#796a79]">
+                      Finding schemes that match your questionnaire...
                     </td>
                   </tr>
                 )}
 
                 {!loading && error && (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center">
+                    <td colSpan={7} className="px-6 py-8 text-center">
                       <p className="text-sm text-[#8a354a]">{error}</p>
                       <button
                         type="button"
@@ -454,17 +489,13 @@ export default function PersonalisedSchemesPage() {
                 {!loading &&
                   !error &&
                   filteredSchemes.map((scheme, index) => {
-                    const schemeId = getField(
-                      scheme,
-                      "scheme_id",
-                      "id",
-                    );
-                    const name = getField(
-                      scheme,
-                      "scheme_name",
-                      "name",
-                      "title",
-                    );
+                    const schemeId = getField(scheme, "scheme_id", "id");
+                    const name = getField(scheme, "scheme_name", "name", "title");
+                    const status = getStatus(scheme);
+
+                    const reasons = Array.isArray(scheme.match_reasons)
+                      ? scheme.match_reasons.map(String)
+                      : [];
 
                     return (
                       <tr
@@ -473,29 +504,43 @@ export default function PersonalisedSchemesPage() {
                       >
                         <td className="max-w-[260px] px-4 py-5 font-medium text-[#512b50]">
                           {name}
-                        </td>
-                        <td className="max-w-[220px] px-4 py-5 text-[#655b6b]">
-                          {getField(
-                            scheme,
-                            "department",
-                            "department_name",
-                            "ministry",
+                          {reasons.length > 0 && (
+                            <ul className="mt-2 list-disc space-y-1 pl-4 text-xs font-normal text-[#65555f]">
+                              {reasons.map((reason, i) => (
+                                <li key={`${schemeId}-reason-${i}`}>
+                                  {reason}
+                                </li>
+                              ))}
+                            </ul>
                           )}
                         </td>
+
+                        <td className="px-4 py-5">
+                          <span className="inline-block rounded-full bg-[#f4eaf2] px-3 py-1 text-xs font-medium text-[#512b50]">
+                            {statusLabel(status)}
+                          </span>
+                        </td>
+
+                        <td className="max-w-[220px] px-4 py-5 text-[#655b6b]">
+                          {getField(scheme, "department", "department_name", "ministry")}
+                        </td>
+
                         <td className="px-4 py-5 text-[#655b6b]">
                           {getField(scheme, "scheme_level", "level")}
                         </td>
+
                         <td className="max-w-[230px] px-4 py-5 text-[#655b6b]">
                           {getField(scheme, "benefits", "description")}
                         </td>
+
                         <td className="max-w-[240px] px-4 py-5 text-[#655b6b]">
                           {getField(
                             scheme,
                             "eligibility_criteria",
-                            "eligibility_rules",
-                            "target_beneficiaries",
+                            "target_beneficiaries"
                           )}
                         </td>
+
                         <td className="whitespace-nowrap px-4 py-5">
                           <Link
                             href={`/${locale}/schemes/${encodeURIComponent(schemeId)}`}
@@ -507,14 +552,42 @@ export default function PersonalisedSchemesPage() {
                       </tr>
                     );
                   })}
+
+                {!loading &&
+                  !error &&
+                  filteredSchemes.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-12 text-center">
+                        <h2 className="text-lg font-semibold">
+                          No matching schemes found
+                        </h2>
+                        <p className="mt-2 text-sm text-[#65555f]">
+                          Try clearing your search or filters. If your
+                          profile is incomplete, review your questionnaire
+                          answers and try again.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSearch("");
+                            setLevelFilter("all");
+                            setDepartmentFilter("all");
+                          }}
+                          className="mt-4 rounded-md bg-[#512b50] px-4 py-2 text-sm font-semibold text-white"
+                        >
+                          Clear filters
+                        </button>
+                      </td>
+                    </tr>
+                  )}
               </tbody>
             </table>
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-<footer className="mt-auto w-full border-t border-[#eee5dc] bg-[#f7f1e7]">        <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-4 px-5 py-5 text-xs text-[#65555f] sm:px-10">
+      <footer className="mt-auto w-full border-t border-[#eee5dc] bg-[#f7f1e7]">
+        <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-4 px-5 py-5 text-xs text-[#65555f] sm:px-10">
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-xl font-semibold text-[#512b50]">
               CivicEase
@@ -523,7 +596,9 @@ export default function PersonalisedSchemesPage() {
               MAHARASHTRA
             </span>
             <span className="hidden text-[#d4c7cb] sm:inline">|</span>
-            <span>© 2025 CivicEase Maharashtra. All statutory rights reserved.</span>
+            <span>
+              © 2025 CivicEase Maharashtra. All statutory rights reserved.
+            </span>
           </div>
 
           <div className="flex flex-wrap gap-5">
@@ -543,7 +618,6 @@ export default function PersonalisedSchemesPage() {
         </div>
       </footer>
 
-      {/* Draggable chatbot using your existing icon */}
       <div
         className="group fixed z-50"
         style={
@@ -559,10 +633,8 @@ export default function PersonalisedSchemesPage() {
         <button
           type="button"
           aria-label="Open CivicEase chatbot. Drag to move."
-          title=""
           onPointerDown={startDragging}
           onPointerMove={moveChatbot}
-          onPointerUp={stopDragging}
           onClick={openChatbot}
           className="flex h-16 w-16 touch-none items-center justify-center rounded-full bg-transparent transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#8754e9]"
           style={{ cursor: "grab" }}

@@ -14,6 +14,11 @@ from pydantic import BaseModel, Field
 from app.Database import get_connection
 from app.Rules import check_scheme_eligibility
 
+from app.Rules import (
+    check_scheme_eligibility,
+    profile_matches_scheme,
+)
+
 
 # --------------------------------------------------
 # Configuration
@@ -211,34 +216,124 @@ def match_schemes(stage: str, business_type: str):
         )
 
 
+
 # --------------------------------------------------
-# JSON-based eligibility checker
+# PostgreSQL-based personalised eligibility matching
 # --------------------------------------------------
 
 @app.post("/eligibility-check")
 def eligibility_check(profile: UserProfile):
-    schemes = load_schemes()
+    answers = profile.details or {}
+
+    # Map questionnaire values to stable backend field names.
+    applicant_profile = {
+        **answers,
+        "business_stage": answers.get("stage"),
+        "business_type": (
+            answers.get("otherBusiness")
+            if answers.get("businessType") == "Other"
+            else answers.get("businessType")
+        ),
+        "beneficiary_category": answers.get("beneficiaryCategory"),
+        "annual_family_income": answers.get("annualFamilyIncome"),
+        "ownership_type": answers.get("ownershipType"),
+        "applicant_type": answers.get("applicantType"),
+        "state": answers.get("state") or answers.get("location"),
+        "district": answers.get("district"),
+        "age_group": answers.get("age"),
+        "education": answers.get("education"),
+        "is_registered": answers.get("isRegistered"),
+        "registrations": answers.get("registrations"),
+        "support_needs": answers.get("supportNeeds"),
+        "funding_range": answers.get("fundingRange"),
+    }
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT *
+                    FROM public.schemes
+                    ORDER BY scheme_id
+                    """
+                )
+                schemes = cur.fetchall()
+
+    except psycopg.Error:
+        logging.exception(
+            "Could not retrieve schemes for eligibility matching"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Could not retrieve schemes for matching.",
+        )
+
     results = []
 
     for scheme in schemes:
-        result = check_scheme_eligibility(
-            profile.details,
-            scheme,
-        )
+        scheme = dict(scheme)
+        rules = scheme.get("eligibility_rules")
 
-        results.append({
-            "scheme_id": scheme["scheme_id"],
-            "name": scheme["name"],
-            **result,
-            "required_documents": scheme.get(
-                "required_documents", []
-            ),
-            "official_source": scheme.get("official_source"),
-            "application_method": scheme.get("application_method"),
-        })
+        # If structured rules exist, use them for eligibility evaluation.
+        if rules:
+            evaluation_scheme = {
+                **scheme,
+                "eligibility_rules": rules,
+            }
+
+            evaluation = check_scheme_eligibility(
+                applicant_profile,
+                evaluation_scheme,
+            )
+
+            # Never recommend a scheme that has a definite failed rule.
+            if evaluation["status"] == "not_eligible":
+                continue
+
+            results.append({
+                **scheme,
+                **evaluation,
+                "match_type": "rule_based",
+                "match_reasons": [
+                    item["reason"]
+                    for item in evaluation["passed_rules"]
+                ],
+            })
+
+        else:
+            # Until verified structured rules exist, show only schemes
+            # with a preliminary business-profile match.
+            matched, reasons = profile_matches_scheme(
+                applicant_profile,
+                scheme,
+            )
+
+            if not matched:
+                continue
+
+            results.append({
+                **scheme,
+                "status": "needs_review",
+                "eligible": None,
+                "match_type": "preliminary",
+                "match_reasons": reasons,
+                "passed_rules": [],
+                "failed_rules": [],
+                "missing_rules": [],
+                "review_rules": [{
+                    "field": "eligibility_rules",
+                    "reason": (
+                        "This is a preliminary profile match. "
+                        "Scheme-specific eligibility rules still need "
+                        "verification."
+                    ),
+                }],
+            })
 
     return {
-        "total_schemes_checked": len(results),
+        "total_schemes_checked": len(schemes),
+        "total_matches": len(results),
         "results": results,
     }
 
